@@ -16,6 +16,8 @@ app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 4000;
 const CONTACT_RECIPIENT = process.env.CONTACT_RECIPIENT || 'office@activcleaning.ro';
 const PRIVACY_CONTACT = process.env.PRIVACY_CONTACT || 'privacy@activcleaning.ro';
+const SMTP_ENABLED = (process.env.SMTP_ENABLED || 'true') !== 'false';
+const SMTP_SKIP_VERIFY = (process.env.SMTP_SKIP_VERIFY || 'false') === 'true';
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 10;
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 730;
 const GDPR_REQUEST_RETENTION_DAYS = Number(process.env.GDPR_REQUEST_RETENTION_DAYS) || 365;
@@ -212,7 +214,7 @@ const emailConfigComplete =
   process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS;
 
 let transporter = null;
-if (emailConfigComplete) {
+if (SMTP_ENABLED && emailConfigComplete) {
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
@@ -223,18 +225,28 @@ if (emailConfigComplete) {
     }
   });
 
-  transporter
-    .verify()
-    .then(() => console.log('Server SMTP pregătit pentru trimiterea emailurilor.'))
-    .catch((error) => {
-      console.error('Nu s-a putut verifica transportul SMTP:', error.message);
-      transporter = null;
-    });
+  if (!SMTP_SKIP_VERIFY) {
+    transporter
+      .verify()
+      .then(() => console.log('Server SMTP pregătit pentru trimiterea emailurilor.'))
+      .catch((error) => {
+        console.error('Nu s-a putut verifica transportul SMTP:', error.message);
+      });
+  } else {
+    console.warn('Verificarea SMTP este sărită (SMTP_SKIP_VERIFY=true).');
+  }
+} else if (!SMTP_ENABLED) {
+  console.warn('SMTP este dezactivat (SMTP_ENABLED=false). Mesajele vor fi doar salvate în baza de date.');
 } else {
   console.warn('Config SMTP incomplet - completați variabilele din .env pentru a trimite emailurile.');
 }
 
 const sendNotificationEmail = async (payload, recordId) => {
+  if (!SMTP_ENABLED) {
+    console.warn('Trimiterea emailurilor este dezactivată. Mesajul va rămâne doar în baza de date.');
+    return;
+  }
+
   if (!transporter) {
     throw new Error('Transporter SMTP indisponibil.');
   }
@@ -271,6 +283,11 @@ const sendNotificationEmail = async (payload, recordId) => {
 };
 
 const sendGdprNotification = async (payload, recordId) => {
+  if (!SMTP_ENABLED) {
+    console.warn('Trimiterea emailurilor GDPR este dezactivată. Cererea este logată doar în baza de date.');
+    return;
+  }
+
   if (!transporter) {
     throw new Error('Transporter SMTP indisponibil.');
   }
@@ -350,7 +367,14 @@ app.post('/api/contact', async (req, res) => {
     };
 
     const recordId = await saveMessage(sanitizedPayload);
-    await sendNotificationEmail(sanitizedPayload, recordId);
+    try {
+      await sendNotificationEmail(sanitizedPayload, recordId);
+    } catch (emailError) {
+      console.error('Eroare trimitere email contact:', emailError);
+      return res.status(503).json({
+        message: 'Mesajul a fost salvat dar emailul nu a putut fi trimis către echipă. Încearcă mai târziu.'
+      });
+    }
 
     return res.status(200).json({
       message: 'Mesaj trimis cu succes. Îți mulțumim!',
@@ -408,7 +432,11 @@ app.post('/api/contact/gdpr-request', async (req, res) => {
     try {
       await sendGdprNotification(sanitizedPayload, recordId);
     } catch (error) {
-      console.error('Eroare trimitere mail GDPR:', error.message);
+      console.error('Eroare trimitere mail GDPR:', error);
+      return res.status(503).json({
+        message:
+          'Cererea a fost înregistrată, dar notificarea email nu a putut fi trimisă. Vom verifica și reveni.'
+      });
     }
 
     return res.status(200).json({
