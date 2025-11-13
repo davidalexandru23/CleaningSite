@@ -27,7 +27,7 @@
                 <div class="container">
                     <p class="eyebrow">Politici & conformitate</p>
                     <h1 class="display-6 fw-semibold mb-3">Protecția datelor și utilizarea cookie-urilor</h1>
-                    <p class="lead mx-auto" style="max-width: 760px;">
+                    <p class="lead mx-auto policy-hero-text">
                         Această pagină descrie modul în care activăm în calitate de operator de date, ce informații
                         colectăm prin formularele site-ului, care este temeiul legal, durata de stocare și cum îți poți
                         exercita drepturile conform GDPR și legislației din România.
@@ -197,92 +197,8 @@
             </div>
         </footer>
     </div>
-
-    <script src="assets/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const consentKey = 'acs-consent';
-        const defaultConsent = { essential: true, external: false };
-        const cookieBanner = document.getElementById('cookieBanner');
-        const acceptEssentialBtn = document.getElementById('acceptEssentialCookies');
-        const acceptAllBtn = document.getElementById('acceptAllCookies');
-        const manageConsentButtons = [
-            document.getElementById('manageConsent'),
-            document.getElementById('manageConsentPrivacy'),
-            document.getElementById('manageConsentPrivacyBlock')
-        ].filter(Boolean);
-
-        const getStoredConsent = () => {
-            try {
-                return JSON.parse(localStorage.getItem(consentKey)) || defaultConsent;
-            } catch {
-                return defaultConsent;
-            }
-        };
-
-        const updateConsent = (newValues) => {
-            const merged = { ...defaultConsent, ...getStoredConsent(), ...newValues };
-            localStorage.setItem(consentKey, JSON.stringify(merged));
-            hideBanner();
-        };
-
-        const showBanner = () => cookieBanner.classList.remove('d-none');
-        const hideBanner = () => cookieBanner.classList.add('d-none');
-
-        if (!localStorage.getItem(consentKey)) {
-            showBanner();
-        }
-
-        acceptEssentialBtn?.addEventListener('click', () => updateConsent({ external: false }));
-        acceptAllBtn?.addEventListener('click', () => updateConsent({ external: true }));
-        manageConsentButtons.forEach((btn) => btn.addEventListener('click', showBanner));
-
-        document.getElementById('year').textContent = new Date().getFullYear();
-
-        const gdprForm = document.getElementById('gdprForm');
-        const gdprSuccess = document.getElementById('gdprSuccess');
-        const gdprError = document.getElementById('gdprError');
-        const gdprSubmit = gdprForm.querySelector('button[type="submit"]');
-        const GDPR_ENDPOINT = window.location.protocol === 'file:'
-            ? 'http://localhost:4000/api/contact/gdpr-request'
-            : '/api/contact/gdpr-request';
-
-        gdprForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            gdprSuccess.classList.add('d-none');
-            gdprError.classList.add('d-none');
-            gdprSubmit.disabled = true;
-            gdprSubmit.textContent = 'Se trimite...';
-            const formData = new FormData(gdprForm);
-            const payload = {
-                fullName: formData.get('fullName')?.trim(),
-                email: formData.get('email')?.trim(),
-                requestType: formData.get('requestType'),
-                message: formData.get('message')?.trim()
-            };
-
-            try {
-                const response = await fetch(GDPR_ENDPOINT, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) {
-                    const result = await response.json().catch(() => ({}));
-                    throw new Error(result?.message || 'Eroare la transmitere.');
-                }
-                gdprSuccess.classList.remove('d-none');
-                gdprForm.reset();
-            } catch (error) {
-                gdprError.textContent = error?.message || 'Nu am putut înregistra cererea.';
-                gdprError.classList.remove('d-none');
-            } finally {
-                gdprSubmit.disabled = false;
-                gdprSubmit.textContent = 'Trimite solicitarea';
-            }
-        });
-    </script>
+    <script src="assets/js/bootstrap.bundle.min.js" defer></script>
+    <script src="assets/js/site.js" defer></script>
 </body>
 
 </html>

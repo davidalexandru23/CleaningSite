@@ -36,7 +36,26 @@ const corsOptions = {
   }
 };
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://plus.unsplash.com"],
+        fontSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'self'", "https://www.google.com", "https://maps.gstatic.com"],
+        objectSrc: ["'none'"],
+        formAction: ["'self'"],
+        baseUri: ["'self'"],
+        upgradeInsecureRequests: []
+      }
+    },
+    crossOriginEmbedderPolicy: false
+  })
+);
 app.use(morgan('combined'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));

@@ -79,6 +79,10 @@ body {
   color: rgba(255, 255, 255, 0.85);
 }
 
+.policy-hero-text {
+  max-width: 760px;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.2em;
