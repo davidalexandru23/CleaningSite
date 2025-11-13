@@ -16,8 +16,13 @@ app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 4000;
 const CONTACT_RECIPIENT = process.env.CONTACT_RECIPIENT || 'office@activcleaning.ro';
 const PRIVACY_CONTACT = process.env.PRIVACY_CONTACT || 'privacy@activcleaning.ro';
-const SMTP_ENABLED = (process.env.SMTP_ENABLED || 'true') !== 'false';
+const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
+const SMTP_ENABLED = EMAIL_PROVIDER === 'brevo_api' ? false : (process.env.SMTP_ENABLED || 'true') !== 'false';
 const SMTP_SKIP_VERIFY = (process.env.SMTP_SKIP_VERIFY || 'false') === 'true';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || process.env.SMTP_USER || CONTACT_RECIPIENT;
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'Activ Cleaning Solutions';
+const USE_BREVO_API = EMAIL_PROVIDER === 'brevo_api' && Boolean(BREVO_API_KEY);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 10;
 const RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 730;
 const GDPR_REQUEST_RETENTION_DAYS = Number(process.env.GDPR_REQUEST_RETENTION_DAYS) || 365;
@@ -214,7 +219,9 @@ const emailConfigComplete =
   process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS;
 
 let transporter = null;
-if (SMTP_ENABLED && emailConfigComplete) {
+if (USE_BREVO_API) {
+  console.log('Email provider set to Brevo API.');
+} else if (SMTP_ENABLED && emailConfigComplete) {
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
@@ -242,6 +249,26 @@ if (SMTP_ENABLED && emailConfigComplete) {
 }
 
 const sendNotificationEmail = async (payload, recordId) => {
+  if (USE_BREVO_API) {
+    return sendViaBrevo({
+      to: CONTACT_RECIPIENT,
+      subject: `Mesaj nou de pe site (#${recordId})`,
+      text: [
+        'Ai primit un mesaj nou prin formularul de contact:',
+        `ID mesaj: ${recordId}`,
+        `Nume: ${payload.fullName}`,
+        `Companie: ${payload.company || '-'}`,
+        `Email: ${payload.email}`,
+        `Telefon: ${payload.phone || '-'}`,
+        `Consimțământ GDPR: ${payload.consent ? 'DA' : 'NU'}`,
+        `IP: ${payload.ipAddress || '-'}`,
+        '',
+        'Mesaj:',
+        payload.message
+      ].join('\n')
+    });
+  }
+
   if (!SMTP_ENABLED) {
     console.warn('Trimiterea emailurilor este dezactivată. Mesajul va rămâne doar în baza de date.');
     return;
@@ -283,6 +310,24 @@ const sendNotificationEmail = async (payload, recordId) => {
 };
 
 const sendGdprNotification = async (payload, recordId) => {
+  if (USE_BREVO_API) {
+    return sendViaBrevo({
+      to: PRIVACY_CONTACT,
+      subject: `Cerere GDPR nouă (#${recordId})`,
+      text: [
+        'Ai primit o nouă cerere GDPR:',
+        `ID cerere: ${recordId}`,
+        `Nume: ${payload.fullName}`,
+        `Email: ${payload.email}`,
+        `Tip solicitare: ${payload.requestType}`,
+        `IP: ${payload.ipAddress || '-'}`,
+        '',
+        'Mesaj:',
+        payload.message
+      ].join('\n')
+    });
+  }
+
   if (!SMTP_ENABLED) {
     console.warn('Trimiterea emailurilor GDPR este dezactivată. Cererea este logată doar în baza de date.');
     return;
@@ -309,6 +354,34 @@ const sendGdprNotification = async (payload, recordId) => {
     subject: `Cerere GDPR nouă (#${recordId})`,
     text: content.join('\n')
   });
+};
+
+const sendViaBrevo = async ({ to, subject, text }) => {
+  if (!BREVO_API_KEY) {
+    throw new Error('Cheie Brevo lipsă.');
+  }
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: {
+        email: BREVO_SENDER_EMAIL,
+        name: BREVO_SENDER_NAME
+      },
+      to: [{ email: to }],
+      subject,
+      textContent: text
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Brevo API error: ${response.status} - ${errorBody}`);
+  }
 };
 
 app.post('/api/contact', async (req, res) => {
