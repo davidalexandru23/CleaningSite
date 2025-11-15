@@ -13,7 +13,7 @@ RUN npm ci --omit=dev
 FROM node:20-bullseye-slim AS runner
 
 ENV NODE_ENV=production
-ENV PORT=4000
+ENV PORT=3000
 
 WORKDIR /app
 
@@ -21,6 +21,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY . .
 
-EXPOSE 4000
+EXPOSE 3000
 
 CMD ["npm", "start"]

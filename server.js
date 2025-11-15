@@ -13,7 +13,7 @@ require('dotenv').config();
 
 const app = express();
 app.set('trust proxy', 1);
-const PORT = Number(process.env.PORT) || 4000;
+const PORT = Number(process.env.PORT) || 3000;
 const CONTACT_RECIPIENT = process.env.CONTACT_RECIPIENT || 'office@activcleaning.ro';
 const PRIVACY_CONTACT = process.env.PRIVACY_CONTACT || 'privacy@activcleaning.ro';
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'smtp').toLowerCase();
