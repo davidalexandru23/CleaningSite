@@ -542,8 +542,8 @@ app.use((err, req, res, next) => {
   return next(err);
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Serverul rulează pe http://localhost:${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Serverul rulează pe portul ${PORT}`);
 });
 
 const gracefulShutdown = () => {
